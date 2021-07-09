@@ -424,57 +424,6 @@ if($_POST['action'] == "delete_server_data"){
         echo "Your password was not accepted";
     }    
 }
-if($_POST['action'] == "delete_storage_data"){
-    if($_POST['storage_backup'] == "storage"){
-        $server_storage = "collector-data-1";
-    } else if($_POST['storage_backup'] == "backup"){
-        $server_storage = "collector-data-backup-1";
-    }
-    $location_folder = explode("_____",$_POST['this_folder']);
-    $location        = $location_folder[0];
-    $this_folder     = $location_folder[1];
-    $exp_id = explode("_", $location)[0];
-    $sql = "SELECT * FROM `view_data_users` WHERE `project_id`='$exp_id' AND `email`=AES_ENCRYPT('$email', '$email_hash_password') AND `hashed_user_id`='$this_folder'";
-    $result = $conn->query($sql);
-	$row = mysqli_fetch_array($result);
-    if (password_verify($row['salt'].$password.$row['pepper'], $row['password'])){
-        if($row['storage_status'] == "f"){
-            $row['trials']--;
-            $files_to_delete = [$this_folder . "_all_data.txt"];
-        } else {
-            $files_to_delete = [];
-        }
-        for($i = 1; $i <= $row['trials']; $i++){
-            array_push($files_to_delete, $this_folder . "_trial_" . $i . ".txt");
-        }
-        
-        gcs_delete_files(
-            $server_storage,
-            "$email/$location",
-            $files_to_delete
-        );
-        
-        /*
-        * update and delete relevant rows in relevant mysql tables
-        */
-        if($_POST['storage_backup'] == "storage"){
-            $sql = "UPDATE `view_data_users` SET `storage_status`='d'
-                WHERE `email`=AES_ENCRYPT('$email', '$email_hash_password') AND `hashed_user_id`='$this_folder'";
-            $result = $conn->query($sql);
-        } else if($_POST['storage_backup'] == "backup"){
-            $sql = "UPDATE `view_data_users` SET `backup_status`='d'
-                WHERE `email`=AES_ENCRYPT('$email', '$email_hash_password') AND `hashed_user_id`='$this_folder'";
-            $result = $conn->query($sql);
-        }
-        if ($conn->query($sql) === TRUE) {
-            // nothing needed
-        } else {
-            echo "Error updating the table of data: " . $conn->error;
-        }
-    } else {
-        echo "Your password was not accepted";
-    }
-}
 
 if($_POST["action"] == "download_server_data"){
     
@@ -482,16 +431,17 @@ if($_POST["action"] == "download_server_data"){
     $location        = $location_folder[0];
     $this_folder     = $location_folder[1];
     $exp_id = explode("_", $location)[0];
-    $sql = "SELECT * FROM `view_project_users` WHERE `project_id`='$exp_id' AND `email`=AES_ENCRYPT('$email', '$email_hash_password')";
+    $sql = "SELECT * FROM `view_data_users` WHERE `project_id`='$exp_id' AND `email`=AES_ENCRYPT('$email', '$email_hash_password')";
+    
     $result = $conn->query($sql);
     $row = mysqli_fetch_array($result);
     if (password_verify($row['salt'].$password.$row['pepper'], $row['password'])){
         //echo "../temp_data/$location/$this_folder";
         $response_json = [];
-        $files_to_send = array_diff(scandir("../server_data/$location/$this_folder"), 
+        $files_to_send = array_diff(scandir("server_data/$location/$this_folder"), 
                                     array('.', '..'));
         foreach($files_to_send as $file_to_send){
-          $response_json[$file_to_send] = file_get_contents("../server_data/$location/$this_folder/$file_to_send");    
+          $response_json[$file_to_send] = file_get_contents("server_data/$location/$this_folder/$file_to_send");    
         }
         echo json_encode($response_json);
         //resume here
